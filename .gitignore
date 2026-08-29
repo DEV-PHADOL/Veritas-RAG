@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Secrets / Config
+.env
+.env.local
+*.key
+
+# Jupyter/Colab
+.ipynb_checkpoints/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Editor/IDE
+.vscode/
+.idea/
+
+# Data
+data/raw/
+data/processed/
+
+# Logs
+*.log
+
+# Frontend (later)
+node_modules/
+dist/
+build/
