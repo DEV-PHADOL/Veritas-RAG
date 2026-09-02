@@ -1,0 +1,37 @@
+# API
+fastapi
+uvicorn[standard]
+
+# Configuration
+pydantic
+pydantic-settings
+python-dotenv
+
+# Database (ORM)
+sqlalchemy
+psycopg[binary]
+pgvector
+
+# LLM
+google-genai
+
+# RAG
+langchain-text-splitters
+langgraph
+rank-bm25
+
+# Embeddings / Reranking
+sentence-transformers
+
+# Math
+numpy
+
+# Documents
+pypdf
+
+# Evaluation
+ragas
+
+# Testing
+pytest
+httpx
