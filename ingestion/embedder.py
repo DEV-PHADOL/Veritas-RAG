@@ -1,5 +1,6 @@
 import os
 import time
+import hashlib
 
 from dotenv import load_dotenv
 from google import genai
@@ -9,70 +10,224 @@ from google.genai.errors import ClientError
 
 load_dotenv()
 
+
+# ==========================================
+# Configuration
+# ==========================================
+
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY is not set.")
-
-
-client = genai.Client(api_key=GEMINI_API_KEY)
 
 MODEL_NAME = "gemini-embedding-001"
 
+OUTPUT_DIMENSION = 768
 
-def embed_chunks(chunks: list[dict]) -> list[dict]:
+# Maximum chunks per embedding request
+BATCH_SIZE = 10
 
-    batch_size = 10
+# Retry configuration
+INITIAL_RETRY_DELAY = 5
+MAX_RETRY_DELAY = 60
 
-    for start in range(0, len(chunks), batch_size):
 
-        batch = chunks[start:start + batch_size]
+# ==========================================
+# Gemini Client
+# ==========================================
 
-        texts = [
-            chunk["text"]
-            for chunk in batch
-        ]
+if not GEMINI_API_KEY:
+    raise ValueError(
+        "GEMINI_API_KEY is not set."
+    )
+
+
+client = genai.Client(
+    api_key=GEMINI_API_KEY
+)
+
+
+# ==========================================
+# In-Memory Embedding Cache
+# ==========================================
+
+embedding_cache = {}
+
+
+def get_text_hash(text: str) -> str:
+
+    normalized_text = text.strip()
+
+    return hashlib.sha256(
+        normalized_text.encode("utf-8")
+    ).hexdigest()
+
+
+# ==========================================
+# Generate Embeddings
+# ==========================================
+
+def embed_chunks(
+    chunks: list[dict]
+) -> list[dict]:
+
+    if not chunks:
+        return chunks
+
+
+    texts_to_embed = []
+    chunks_to_embed = []
+
+
+    # ==========================================
+    # Check Cache
+    # ==========================================
+
+    for chunk in chunks:
+
+        text = chunk["text"]
+
+        text_hash = get_text_hash(text)
+
+
+        if text_hash in embedding_cache:
+
+            chunk["embedding"] = (
+                embedding_cache[text_hash]
+            )
+
+        else:
+
+            texts_to_embed.append(text)
+
+            chunks_to_embed.append(
+                (chunk, text_hash)
+            )
+
+
+    # ==========================================
+    # All Found In Cache
+    # ==========================================
+
+    if not texts_to_embed:
 
         print(
-            f"Embedding chunks "
-            f"{start + 1} to {start + len(batch)}..."
+            "All embeddings found in cache."
         )
 
-        while True:
+        return chunks
 
-            try:
 
-                result = client.models.embed_content(
+    print(
+        f"Embedding {len(texts_to_embed)} chunks..."
+    )
+
+
+    # ==========================================
+    # Retry API Request
+    # ==========================================
+
+    retry_delay = INITIAL_RETRY_DELAY
+    retry_count = 0
+
+
+    while True:
+
+        try:
+
+            result = (
+                client.models.embed_content(
+
                     model=MODEL_NAME,
-                    contents=texts,
+
+                    contents=texts_to_embed,
+
                     config=types.EmbedContentConfig(
-                        task_type="RETRIEVAL_DOCUMENT",
-                        output_dimensionality=768
+
+                        task_type=(
+                            "RETRIEVAL_DOCUMENT"
+                        ),
+
+                        output_dimensionality=(
+                            OUTPUT_DIMENSION
+                        )
+
                     )
+
+                )
+            )
+
+
+            # API request successful
+            break
+
+
+        except ClientError as error:
+
+            if error.code == 429:
+
+                retry_count += 1
+
+
+                print(
+
+                    f"Rate limit reached. "
+                    f"Retry attempt {retry_count}. "
+                    f"Waiting {retry_delay} seconds..."
+
                 )
 
-                break
 
-            except ClientError as error:
+                time.sleep(
+                    retry_delay
+                )
 
-                if error.code == 429:
 
-                    print(
-                        "Rate limit reached. "
-                        "Waiting 60 seconds..."
-                    )
+                # Exponential backoff
+                retry_delay = min(
 
-                    time.sleep(60)
+                    retry_delay * 2,
 
-                else:
-                    raise
+                    MAX_RETRY_DELAY
 
-        for chunk, embedding in zip(
-            batch,
-            result.embeddings
-        ):
-            chunk["embedding"] = embedding.values
+                )
 
-        time.sleep(2)
+
+            else:
+
+                raise
+
+
+    # ==========================================
+    # Attach Embeddings
+    # ==========================================
+
+    for (
+        (chunk, text_hash),
+        embedding
+    ) in zip(
+
+        chunks_to_embed,
+
+        result.embeddings
+
+    ):
+
+
+        embedding_values = (
+            embedding.values
+        )
+
+
+        # Attach embedding
+
+        chunk["embedding"] = (
+            embedding_values
+        )
+
+
+        # Save in memory cache
+
+        embedding_cache[
+            text_hash
+        ] = embedding_values
+
 
     return chunks
