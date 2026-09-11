@@ -231,3 +231,24 @@ def embed_chunks(
 
 
     return chunks
+
+
+def embed_query(
+    query:str
+) -> list[float]:
+    
+    if not query.strip():
+        raise ValueError(
+            "Query cannot be empty."
+        )
+        
+    result = client.models.embed_content(
+        model=MODEL_NAME,
+        contents=[query],
+        config=types.EmbedContentConfig(
+            task_type="RETRIEVAL_QUERY",
+            output_dimensionality=(OUTPUT_DIMENSION)
+        )
+    )
+    
+    return result.embeddings[0].values
