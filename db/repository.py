@@ -1,7 +1,13 @@
+import hashlib
+
 from sqlalchemy.orm import Session
 
 from db.models import Document, DocumentChunk
 
+def calculate_content_hash(text: str) -> str:
+    return hashlib.sha256(
+        text.strip().encode("utf-8")
+    ).hexdigest()
 
 # ==========================================
 # Create Document
@@ -46,11 +52,19 @@ def insert_chunks(
 
         for chunk_data in chunks:
 
+            content = chunk_data["text"]
+
+            content_hash = calculate_content_hash(
+                content
+            )
+
             chunk = DocumentChunk(
 
                 document_id=document.id,
 
-                content=chunk_data["text"],
+                content=content,
+
+                content_hash=content_hash,
 
                 page_number=(
                     chunk_data["page_number"]
@@ -64,16 +78,13 @@ def insert_chunks(
 
             db.add(chunk)
 
-
         db.commit()
-
 
     except Exception:
 
         db.rollback()
 
         raise
-
 
 # ==========================================
 # Get Document By Hash
@@ -147,23 +158,25 @@ def mark_document_completed(
 # Mark Document As Failed
 # ==========================================
 
-def mark_document_failed(
+def mark_document_failed(db: Session, document: Document):
+    try:
+        # Remove any chunks that were inserted before ingestion failed.
+        (
+            db.query(DocumentChunk)
+            .filter(
+                DocumentChunk.document_id == document.id
+            )
+            .delete(synchronize_session=False)
+        )
 
-    db: Session,
+        # Mark the document as failed.
+        document.ingestion_status = "FAILED"
 
-    document: Document
+        db.commit()
 
-):
-
-    return update_document_status(
-
-        db=db,
-
-        document=document,
-
-        status="FAILED"
-
-    )
+    except Exception:
+        db.rollback()
+        raise
 
 
 # ==========================================
@@ -211,3 +224,30 @@ def search_documents(
 
 
     return results
+
+
+def delete_document_chunks(db: Session, document_id: int):
+    try:
+        (
+            db.query(DocumentChunk)
+            .filter(DocumentChunk.document_id == document_id)
+            .delete(synchronize_session=False)
+        )
+
+        db.commit()
+
+    except Exception:
+        db.rollback()
+        raise
+    
+def get_chunk_by_content_hash(
+    db: Session,
+    content_hash: str
+):
+    return (
+        db.query(DocumentChunk)
+        .filter(
+            DocumentChunk.content_hash == content_hash
+        )
+        .first()
+    )

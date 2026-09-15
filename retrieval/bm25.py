@@ -1,6 +1,7 @@
 import re
 
 from rank_bm25 import BM25Okapi
+from sqlalchemy.orm import Session
 
 from db.models import DocumentChunk
 
@@ -8,73 +9,57 @@ from db.models import DocumentChunk
 class BM25Retriever:
 
     def __init__(self):
-
         self.bm25 = None
         self.chunks = []
 
-
     def tokenize(self, text: str) -> list[str]:
+        return re.findall(r"\b\w+\b", text.lower())
 
-        return re.findall(
-            r"\b\w+\b",
-            text.lower()
-        )
+    def build_index(
+        self,
+        db: Session,
+        document_id: int | None = None
+    ):
+        """
+        Build BM25 index.
 
+        If document_id is provided, only chunks
+        belonging to that document are indexed.
+        """
 
-    def build_index(self, db):
+        query = db.query(DocumentChunk)
 
-        print("Building BM25 index...")
+        # Filter chunks by document when document_id is provided
+        if document_id is not None:
+            query = query.filter(
+                DocumentChunk.document_id == document_id
+            )
 
-        chunks = (
-            db.query(DocumentChunk)
-            .all()
-        )
+        chunks = query.all()
 
         if not chunks:
-
-            raise ValueError(
-                "No document chunks found."
-            )
-
+            raise ValueError("No document chunks found.")
 
         tokenized_chunks = []
-
         self.chunks = []
 
-
         for chunk in chunks:
+            tokens = self.tokenize(chunk.content)
 
-            tokens = self.tokenize(
-                chunk.content
-            )
-
-            tokenized_chunks.append(
-                tokens
-            )
+            tokenized_chunks.append(tokens)
 
             self.chunks.append({
-
                 "chunk_id": chunk.id,
-
                 "document_id": chunk.document_id,
-
                 "content": chunk.content,
-
                 "page_number": chunk.page_number
-
             })
 
-
-        self.bm25 = BM25Okapi(
-            tokenized_chunks
-        )
-
+        self.bm25 = BM25Okapi(tokenized_chunks)
 
         print(
-            f"BM25 index built for "
-            f"{len(chunks)} document chunks."
+            f"BM25 index built for {len(chunks)} document chunks."
         )
-
 
     def search(
         self,
@@ -83,62 +68,30 @@ class BM25Retriever:
     ) -> list[dict]:
 
         if self.bm25 is None:
+            raise ValueError("BM25 index is not built.")
 
-            raise ValueError(
-                "BM25 index is not built."
-            )
+        tokenized_query = self.tokenize(query)
 
-
-        tokenized_query = self.tokenize(
-            query
-        )
-
-
-        scores = self.bm25.get_scores(
-            tokenized_query
-        )
-
+        scores = self.bm25.get_scores(tokenized_query)
 
         ranked_indices = sorted(
-
             range(len(scores)),
-
             key=lambda i: scores[i],
-
             reverse=True
-
         )[:top_k]
 
-
         results = []
-
 
         for index in ranked_indices:
 
             chunk = self.chunks[index]
 
-
             results.append({
-
                 "chunk_id": chunk["chunk_id"],
-
-                "document_id": (
-                    chunk["document_id"]
-                ),
-
-                "content": (
-                    chunk["content"]
-                ),
-
-                "page_number": (
-                    chunk["page_number"]
-                ),
-
-                "score": float(
-                    scores[index]
-                )
-
+                "document_id": chunk["document_id"],
+                "content": chunk["content"],
+                "page_number": chunk["page_number"],
+                "score": float(scores[index])
             })
-
 
         return results

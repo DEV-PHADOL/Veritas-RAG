@@ -1,57 +1,18 @@
-import os
-import time
-import hashlib
+from sentence_transformers import SentenceTransformer
+from sqlalchemy.orm import Session
 
-from dotenv import load_dotenv
-from google import genai
-from google.genai import types
-from google.genai.errors import ClientError
+from db.repository import get_chunk_by_content_hash
 
 
-load_dotenv()
-
-
-# ==========================================
-# Configuration
-# ==========================================
-
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-MODEL_NAME = "gemini-embedding-001"
-
+# 768-dimensional local embedding model
+MODEL_NAME = "sentence-transformers/all-mpnet-base-v2"
 OUTPUT_DIMENSION = 768
 
-# Maximum chunks per embedding request
-BATCH_SIZE = 10
-
-# Retry configuration
-INITIAL_RETRY_DELAY = 5
-MAX_RETRY_DELAY = 60
-
-
-# ==========================================
-# Gemini Client
-# ==========================================
-
-if not GEMINI_API_KEY:
-    raise ValueError(
-        "GEMINI_API_KEY is not set."
-    )
-
-
-client = genai.Client(
-    api_key=GEMINI_API_KEY
-)
-
-
-# ==========================================
-# In-Memory Embedding Cache
-# ==========================================
-
-embedding_cache = {}
+model = SentenceTransformer(MODEL_NAME)
 
 
 def get_text_hash(text: str) -> str:
+    import hashlib
 
     normalized_text = text.strip()
 
@@ -60,195 +21,99 @@ def get_text_hash(text: str) -> str:
     ).hexdigest()
 
 
-# ==========================================
-# Generate Embeddings
-# ==========================================
-
 def embed_chunks(
+    db: Session,
     chunks: list[dict]
 ) -> list[dict]:
 
     if not chunks:
         return chunks
 
-
     texts_to_embed = []
     chunks_to_embed = []
 
+    memory_cache_hits = 0
+    database_cache_hits = 0
 
-    # ==========================================
-    # Check Cache
-    # ==========================================
-
+    # Check existing embeddings first
     for chunk in chunks:
 
         text = chunk["text"]
-
         text_hash = get_text_hash(text)
 
-
+        # In-memory cache
         if text_hash in embedding_cache:
+            chunk["embedding"] = embedding_cache[text_hash]
+            memory_cache_hits += 1
+            continue
 
-            chunk["embedding"] = (
-                embedding_cache[text_hash]
-            )
-
-        else:
-
-            texts_to_embed.append(text)
-
-            chunks_to_embed.append(
-                (chunk, text_hash)
-            )
-
-
-    # ==========================================
-    # All Found In Cache
-    # ==========================================
-
-    if not texts_to_embed:
-
-        print(
-            "All embeddings found in cache."
+        # Database cache
+        existing_chunk = get_chunk_by_content_hash(
+            db=db,
+            content_hash=text_hash
         )
 
+        if existing_chunk is not None:
+            chunk["embedding"] = existing_chunk.embedding
+            embedding_cache[text_hash] = existing_chunk.embedding
+            database_cache_hits += 1
+            continue
+
+        texts_to_embed.append(text)
+        chunks_to_embed.append((chunk, text_hash))
+
+    print(f"Memory cache hits: {memory_cache_hits}")
+    print(f"Database cache hits: {database_cache_hits}")
+    print(f"New embeddings required: {len(texts_to_embed)}")
+
+    if not texts_to_embed:
+        print("All embeddings found in cache.")
         return chunks
 
+    print(f"Embedding {len(texts_to_embed)} chunks locally...")
 
-    print(
-        f"Embedding {len(texts_to_embed)} chunks..."
+    # Generate embeddings locally
+    embeddings = model.encode(
+        texts_to_embed,
+        batch_size=32,
+        normalize_embeddings=True,
+        convert_to_numpy=False,
+        show_progress_bar=False
     )
 
+    if len(embeddings) != len(chunks_to_embed):
+        raise RuntimeError(
+            "Unexpected number of embeddings returned."
+        )
 
-    # ==========================================
-    # Retry API Request
-    # ==========================================
-
-    retry_delay = INITIAL_RETRY_DELAY
-    retry_count = 0
-
-
-    while True:
-
-        try:
-
-            result = (
-                client.models.embed_content(
-
-                    model=MODEL_NAME,
-
-                    contents=texts_to_embed,
-
-                    config=types.EmbedContentConfig(
-
-                        task_type=(
-                            "RETRIEVAL_DOCUMENT"
-                        ),
-
-                        output_dimensionality=(
-                            OUTPUT_DIMENSION
-                        )
-
-                    )
-
-                )
-            )
-
-
-            # API request successful
-            break
-
-
-        except ClientError as error:
-
-            if error.code == 429:
-
-                retry_count += 1
-
-
-                print(
-
-                    f"Rate limit reached. "
-                    f"Retry attempt {retry_count}. "
-                    f"Waiting {retry_delay} seconds..."
-
-                )
-
-
-                time.sleep(
-                    retry_delay
-                )
-
-
-                # Exponential backoff
-                retry_delay = min(
-
-                    retry_delay * 2,
-
-                    MAX_RETRY_DELAY
-
-                )
-
-
-            else:
-
-                raise
-
-
-    # ==========================================
-    # Attach Embeddings
-    # ==========================================
-
+    # Attach embeddings to chunks
     for (
         (chunk, text_hash),
         embedding
-    ) in zip(
+    ) in zip(chunks_to_embed, embeddings):
 
-        chunks_to_embed,
+        embedding_values = embedding.tolist()
 
-        result.embeddings
+        chunk["embedding"] = embedding_values
 
-    ):
-
-
-        embedding_values = (
-            embedding.values
-        )
-
-
-        # Attach embedding
-
-        chunk["embedding"] = (
-            embedding_values
-        )
-
-
-        # Save in memory cache
-
-        embedding_cache[
-            text_hash
-        ] = embedding_values
-
+        embedding_cache[text_hash] = embedding_values
 
     return chunks
 
 
-def embed_query(
-    query:str
-) -> list[float]:
-    
+def embed_query(query: str) -> list[float]:
+
     if not query.strip():
-        raise ValueError(
-            "Query cannot be empty."
-        )
-        
-    result = client.models.embed_content(
-        model=MODEL_NAME,
-        contents=[query],
-        config=types.EmbedContentConfig(
-            task_type="RETRIEVAL_QUERY",
-            output_dimensionality=(OUTPUT_DIMENSION)
-        )
+        raise ValueError("Query cannot be empty.")
+
+    embedding = model.encode(
+        query,
+        normalize_embeddings=True,
+        convert_to_numpy=False
     )
-    
-    return result.embeddings[0].values
+
+    return embedding.tolist()
+
+
+# In-memory embedding cache
+embedding_cache = {}
