@@ -11,7 +11,7 @@ class GeminiGenerator:
 
     def __init__(
         self,
-        model_name: str = "gemini-2.5-flash"
+        model_name: str = "gemini-3.6-flash"
     ):
         api_key = os.getenv("GEMINI_API_KEY")
 

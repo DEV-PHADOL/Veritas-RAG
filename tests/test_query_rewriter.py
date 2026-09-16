@@ -5,15 +5,23 @@ def main():
 
     rewriter = QueryRewriter()
 
-    query = "Tell me about training"
+    queries = [
+        "What is cybersecurity awareness training?",
+        "Why is security training important?",
+        "Tell me about training",
+        "What are the responsibilities of employees?"
+    ]
 
-    rewritten_query = rewriter.rewrite(query)
+    for query in queries:
 
-    print("\nOriginal Query:")
-    print(query)
+        rewritten_query = rewriter.rewrite(query)
 
-    print("\nRewritten Query:")
-    print(rewritten_query)
+        print("\n" + "=" * 50)
+        print("Original Query:")
+        print(query)
+
+        print("\nRewritten Query:")
+        print(rewritten_query)
 
 
 if __name__ == "__main__":
