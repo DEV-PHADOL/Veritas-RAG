@@ -4,52 +4,48 @@ from retrieval.reranker import Reranker
 
 
 def main():
-    query = "What is inflation?"
 
-    db = SessionLocal()
+    test_queries = [
+        "What is cybersecurity awareness training?",
+        "What is the population of India?"
+    ]
 
-    try:
-        # Build BM25 index
-        hybrid_retriever = HybridRetriever()
-        hybrid_retriever.build_index(db)
+    for query in test_queries:
 
-        # Get hybrid results
-        print("\nRunning Hybrid Retrieval...")
+        print("\n" + "=" * 60)
+        print(f"QUERY: {query}")
+        print("=" * 60)
 
-        hybrid_results = hybrid_retriever.search(
-            db=db,
-            query=query,
-            top_k=10
-        )
+        db = SessionLocal()
 
-        print(f"\nHybrid results: {len(hybrid_results)}")
+        try:
+            hybrid_retriever = HybridRetriever()
 
-        # Load reranker
-        reranker = Reranker()
+            hybrid_results = hybrid_retriever.search(
+                db=db,
+                query=query,
+                top_k=10
+            )
 
-        # Rerank results
-        print("\nRunning Reranker...")
+            reranker = Reranker()
 
-        reranked_results = reranker.rerank(
-            query=query,
-            results=hybrid_results,
-            top_k=5
-        )
+            reranked_results = reranker.rerank(
+                query=query,
+                results=hybrid_results,
+                top_k=5
+            )
 
-        print("\nReranked Results:\n")
+            print("\nReranker Scores:\n")
 
-        for result in reranked_results:
-            print(f"Chunk ID: {result['chunk_id']}")
-            print(f"Document ID: {result['document_id']}")
-            print(f"Page Number: {result['page_number']}")
-            print(f"RRF Score: {result['rrf_score']}")
-            print(f"Rerank Score: {result['rerank_score']}")
-            print(f"Content: {result['content']}")
-            print("-" * 60)
+            for result in reranked_results:
 
-    finally:
-        db.close()
+                print(
+                    f"Score: {result['rerank_score']:.4f} | "
+                    f"Page: {result['page_number']}"
+                )
 
+        finally:
+            db.close()
 
 if __name__ == "__main__":
     main()
