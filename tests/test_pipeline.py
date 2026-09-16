@@ -4,7 +4,7 @@ from generation.pipeline import RAGPipeline
 
 def main():
 
-    query = "What is cybersecurity awareness training?"
+    query = "How much does cybersecurity training cost?"
 
     print("Initializing RAG pipeline...")
 
