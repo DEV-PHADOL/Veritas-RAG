@@ -36,7 +36,21 @@ class RAGPipeline:
             )
         
         # 1. Rewrite the user query
-        rewritten_query = self.query_rewriter.rewrite(query)
+        try:
+
+            rewritten_query = self.query_rewriter.rewrite(query)
+
+        except Exception as error:
+
+            print(
+                f"Query rewriting failed: {error}"
+            )
+
+            print(
+                "Falling back to original query."
+            )
+
+            rewritten_query = query
 
         print("\nOriginal Query:")
         print(query)

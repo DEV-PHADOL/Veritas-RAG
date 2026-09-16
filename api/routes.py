@@ -1,15 +1,32 @@
 from fastapi import APIRouter, Depends, HTTPException
+from httpcore import request
+from httpcore import request
 from sqlalchemy.orm import Session
 
 from db.connection import SessionLocal
 from generation.pipeline import RAGPipeline
 from api.schemas import AskRequest, AskResponse
+from generation.llm import GeminiServiceError
 
 
 router = APIRouter()
 
-pipeline = RAGPipeline()
+pipeline = None
 
+pipeline: RAGPipeline | None = None
+
+
+def get_pipeline() -> RAGPipeline:
+
+    global pipeline
+
+    if pipeline is None:
+
+        print("Initializing RAG pipeline...")
+
+        pipeline = RAGPipeline()
+
+    return pipeline
 
 def get_db():
 
@@ -30,7 +47,9 @@ def ask_question(
 
     try:
 
-        result = pipeline.answer(
+        rag_pipeline = get_pipeline()
+
+        result = rag_pipeline.answer(
             db=db,
             query=request.query,
             top_k=request.top_k,
@@ -40,6 +59,18 @@ def ask_question(
 
         return result
 
+    except GeminiServiceError as error:
+
+        print(f"Gemini Service Error: {error}")
+
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "The AI service is temporarily unavailable. "
+                "Please try again later."
+            )
+        )
+
     except Exception as error:
 
         print(f"API Error: {error}")
@@ -48,3 +79,11 @@ def ask_question(
             status_code=500,
             detail="An error occurred while processing your question."
         )
+        
+@router.get("/health")
+def health_check():
+
+    return {
+        "status": "healthy",
+        "service": "VERITAS-RAG API"
+    }

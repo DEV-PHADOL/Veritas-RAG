@@ -1,7 +1,13 @@
 from fastapi import FastAPI
 
-app = FastAPI()
+from api.routes import router
 
-@app.get("/")
-def read_root():
-    return {"Message": "Hello World!"}
+
+app = FastAPI(
+    title="VERITAS-RAG API",
+    description="Hybrid RAG with Reranking and Corrective RAG",
+    version="1.0.0"
+)
+
+
+app.include_router(router)
