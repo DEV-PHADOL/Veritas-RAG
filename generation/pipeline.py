@@ -5,6 +5,7 @@ from generation.context_builder import build_context
 from generation.prompt import build_rag_prompt
 from generation.llm import GeminiGenerator
 from retrieval.relevance import RelevanceChecker
+from generation.query_rewriter import QueryRewriter
 
 class RAGPipeline:
 
@@ -17,6 +18,8 @@ class RAGPipeline:
         self.relevance_checker = RelevanceChecker(
             threshold=0.0
         )
+        
+        self.query_rewriter = QueryRewriter()
 
     def answer(
         self,
@@ -31,11 +34,20 @@ class RAGPipeline:
             raise ValueError(
                 "Query cannot be empty."
             )
+        
+        # 1. Rewrite the user query
+        rewritten_query = self.query_rewriter.rewrite(query)
 
-        # 1. Retrieve and rerank
+        print("\nOriginal Query:")
+        print(query)
+
+        print("\nRewritten Query:")
+        print(rewritten_query)
+
+        
         results = self.retriever.search(
             db=db,
-            query=query,
+            query=rewritten_query,
             top_k=top_k,
             candidate_k=candidate_k,
             document_id=document_id
