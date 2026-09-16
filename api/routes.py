@@ -1,6 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException
-from httpcore import request
-from httpcore import request
 from sqlalchemy.orm import Session
 
 from db.connection import SessionLocal
@@ -8,10 +6,7 @@ from generation.pipeline import RAGPipeline
 from api.schemas import AskRequest, AskResponse
 from generation.llm import GeminiServiceError
 
-
 router = APIRouter()
-
-pipeline = None
 
 pipeline: RAGPipeline | None = None
 

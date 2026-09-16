@@ -107,8 +107,10 @@ class RAGPipeline:
         sources = [
             {
                 "document_id": result["document_id"],
+                "filename": result["filename"],
                 "chunk_id": result["chunk_id"],
-                "page_number": result["page_number"]
+                "page_number": result["page_number"],
+                "content": result["content"][:300]
             }
             for result in results
         ]

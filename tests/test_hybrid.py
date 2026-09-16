@@ -102,10 +102,7 @@ def main():
                 f"{result['chunk_id']}"
             )
 
-            print(
-                f"Document ID: "
-                f"{result['document_id']}"
-            )
+            print(f"Filename: {result['filename']}")
 
             print(
                 f"Page Number: "

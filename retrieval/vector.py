@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from db.models import DocumentChunk
+from db.models import Document, DocumentChunk
 
 
 class VectorRetriever:
@@ -22,12 +22,17 @@ class VectorRetriever:
         query = (
             db.query(
                 DocumentChunk,
+                Document.filename,
                 distance
+            )
+            .join(
+                Document,
+                DocumentChunk.document_id == Document.id
             )
         )
 
-        # Filter by document when document_id is provided
         if document_id is not None:
+
             query = query.filter(
                 DocumentChunk.document_id == document_id
             )
@@ -41,13 +46,22 @@ class VectorRetriever:
 
         formatted_results = []
 
-        for chunk, distance_value in results:
+        for chunk, filename, distance_value in results:
+
             formatted_results.append({
+
                 "chunk_id": chunk.id,
+
                 "document_id": chunk.document_id,
+
+                "filename": filename,
+
                 "content": chunk.content,
+
                 "page_number": chunk.page_number,
+
                 "score": float(distance_value)
+
             })
 
         return formatted_results

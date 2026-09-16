@@ -28,10 +28,11 @@ class AskRequest(BaseModel):
     )
     
 class SourceResponse(BaseModel):
-
     document_id: int
+    filename: str
     chunk_id: int
     page_number: int
+    content: str
 
 
 class AskResponse(BaseModel):

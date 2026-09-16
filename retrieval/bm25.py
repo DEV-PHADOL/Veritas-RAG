@@ -3,7 +3,7 @@ import re
 from rank_bm25 import BM25Okapi
 from sqlalchemy.orm import Session
 
-from db.models import DocumentChunk
+from db.models import Document, DocumentChunk
 
 
 class BM25Retriever:
@@ -27,7 +27,13 @@ class BM25Retriever:
         belonging to that document are indexed.
         """
 
-        query = db.query(DocumentChunk)
+        query = (
+            db.query(DocumentChunk)
+            .join(
+                Document,
+                DocumentChunk.document_id == Document.id
+            )
+        )
 
         # Filter chunks by document when document_id is provided
         if document_id is not None:
@@ -51,6 +57,7 @@ class BM25Retriever:
             self.chunks.append({
                 "chunk_id": chunk.id,
                 "document_id": chunk.document_id,
+                "filename": chunk.document.filename,
                 "content": chunk.content,
                 "page_number": chunk.page_number
             })
@@ -89,6 +96,7 @@ class BM25Retriever:
             results.append({
                 "chunk_id": chunk["chunk_id"],
                 "document_id": chunk["document_id"],
+                "filename": chunk["filename"],
                 "content": chunk["content"],
                 "page_number": chunk["page_number"],
                 "score": float(scores[index])
