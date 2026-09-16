@@ -4,7 +4,7 @@ from retrieval.hybrid import HybridRetriever
 from generation.context_builder import build_context
 from generation.prompt import build_rag_prompt
 from generation.llm import GeminiGenerator
-
+from retrieval.relevance import RelevanceChecker
 
 class RAGPipeline:
 
@@ -13,6 +13,10 @@ class RAGPipeline:
         self.retriever = HybridRetriever()
 
         self.generator = GeminiGenerator()
+
+        self.relevance_checker = RelevanceChecker(
+            threshold=0.0
+        )
 
     def answer(
         self,
@@ -37,6 +41,21 @@ class RAGPipeline:
             document_id=document_id
         )
 
+        # Check retrieval relevance
+        is_relevant = self.relevance_checker.is_relevant(
+            results
+        )
+
+        if not is_relevant:
+
+            return {
+                "answer": (
+                    "I couldn't find relevant information "
+                    "in the provided documents."
+                ),
+                "sources": [],
+                "retrieval_status": "irrelevant"
+            }
         # 2. Build context
         context = build_context(results)
 
