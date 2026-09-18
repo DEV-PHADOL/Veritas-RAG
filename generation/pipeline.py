@@ -6,6 +6,7 @@ from generation.prompt import build_rag_prompt
 from generation.llm import GeminiGenerator
 from retrieval.relevance import RelevanceChecker
 from generation.query_rewriter import QueryRewriter
+from evals.llm_evaluator import LLMEvaluator
 
 class RAGPipeline:
 
@@ -20,6 +21,7 @@ class RAGPipeline:
         )
         
         self.query_rewriter = QueryRewriter()
+        self.llm_evaluator = LLMEvaluator()
 
     def answer(
         self,
@@ -103,6 +105,12 @@ class RAGPipeline:
 
         # 4. Generate answer
         answer = self.generator.generate(prompt)
+        
+        faithfulness = self.llm_evaluator.evaluate_faithfulness(
+            question=query,
+            answer=answer,
+            context=context
+        )
 
         # 5. Return answer and sources
         sources = [
@@ -120,5 +128,6 @@ class RAGPipeline:
             "answer": answer,
             "sources": sources,
             "evaluation_context": context,
-            "retrieval_status": "relevant"
+            "retrieval_status": "relevant",
+            "faithfulness": faithfulness
         }

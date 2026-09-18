@@ -42,3 +42,5 @@ class AskResponse(BaseModel):
     sources: list[SourceResponse]
 
     retrieval_status: str = "relevant"
+
+    faithfulness: str | None = None

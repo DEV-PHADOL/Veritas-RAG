@@ -22,10 +22,9 @@ def get_text_hash(text: str) -> str:
 
 
 def embed_chunks(
-    db: Session,
-    chunks: list[dict]
+    chunks: list[dict],
+    db: Session | None = None
 ) -> list[dict]:
-
     if not chunks:
         return chunks
 
@@ -48,10 +47,13 @@ def embed_chunks(
             continue
 
         # Database cache
-        existing_chunk = get_chunk_by_content_hash(
-            db=db,
-            content_hash=text_hash
-        )
+        existing_chunk = None
+
+        if db is not None:
+            existing_chunk = get_chunk_by_content_hash(
+                db=db,
+                content_hash=text_hash
+            )
 
         if existing_chunk is not None:
             chunk["embedding"] = existing_chunk.embedding
