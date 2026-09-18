@@ -251,3 +251,29 @@ def get_chunk_by_content_hash(
         )
         .first()
     )
+    
+    
+# ==========================================
+# Get All Documents
+# ==========================================
+
+def get_all_documents(db: Session):
+
+    return (
+        db.query(Document)
+        .order_by(Document.created_at.desc())
+        .all()
+    )
+    
+    
+# ==========================================
+# Get Document by ID
+# ==========================================
+
+def get_document_by_id(db: Session, document_id: int):
+
+    return (
+        db.query(Document)
+        .filter(Document.id == document_id)
+        .first()
+    )

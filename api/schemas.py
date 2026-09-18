@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from datetime import datetime
 
 
 class AskRequest(BaseModel):
@@ -44,3 +45,10 @@ class AskResponse(BaseModel):
     retrieval_status: str = "relevant"
 
     faithfulness: str | None = None
+    
+    
+class DocumentResponse(BaseModel):
+    id: int
+    filename: str
+    ingestion_status: str
+    created_at: datetime

@@ -5,6 +5,11 @@ from db.connection import SessionLocal
 from generation.pipeline import RAGPipeline
 from api.schemas import AskRequest, AskResponse
 from generation.llm import GeminiServiceError
+from api.schemas import DocumentResponse
+from db.repository import get_all_documents
+from fastapi import HTTPException
+from db.repository import get_document_by_id
+from sqlalchemy import text
 
 import os
 import tempfile
@@ -48,7 +53,26 @@ def ask_question(
 ):
 
     try:
+        if request.document_id is not None:
 
+            document = get_document_by_id(
+                db=db,
+                document_id=request.document_id
+            )
+
+            if document is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Document not found"
+                )
+            if document.ingestion_status != "COMPLETED":
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Document is not ready. "
+                        f"Current status: {document.ingestion_status}"
+                    )
+                )
         rag_pipeline = get_pipeline()
 
         result = rag_pipeline.answer(
@@ -60,6 +84,9 @@ def ask_question(
         )
 
         return result
+
+    except HTTPException:
+        raise
 
     except GeminiServiceError as error:
 
@@ -82,13 +109,31 @@ def ask_question(
             detail="An error occurred while processing your question."
         )
         
+        
 @router.get("/health")
-def health_check():
+def health_check(db: Session = Depends(get_db)):
 
-    return {
-        "status": "healthy",
-        "service": "VERITAS-RAG API"
-    }
+    try:
+        db.execute(text("SELECT 1"))
+
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "service": "VERITAS-RAG API"
+        }
+
+    except Exception as error:
+
+        print(f"Health Check Error: {error}")
+
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "unhealthy",
+                "database": "disconnected",
+                "service": "VERITAS-RAG API"
+            }
+        )
     
 @router.post("/ingest")
 async def ingest_document(
@@ -139,3 +184,11 @@ async def ingest_document(
 
         if temp_path and os.path.exists(temp_path):
             os.remove(temp_path)
+            
+            
+@router.get("/documents", response_model=list[DocumentResponse])
+def get_documents(db: Session = Depends(get_db)):
+
+    documents = get_all_documents(db)
+
+    return documents
