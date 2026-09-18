@@ -50,6 +50,10 @@ class HybridRetriever:
         self.bm25_ready = True
         self.bm25_document_id = document_id
 
+    def invalidate_index(self):
+        self.bm25_ready = False
+        self.bm25_document_id = None
+    
     def search(
         self,
         db: Session,

@@ -116,6 +116,8 @@ async def ingest_document(
             temp_path = temp_file.name
 
         document = ingest_pdf(temp_path)
+        if pipeline is not None:
+            pipeline.retriever.invalidate_index()
 
         return {
             "message": "Document ingested successfully",
