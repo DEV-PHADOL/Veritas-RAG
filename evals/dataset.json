@@ -1,0 +1,32 @@
+[
+    {
+        "question": "What is cybersecurity awareness training?",
+        "expected_answer": "Cybersecurity awareness training helps employees understand security threats and follow secure practices.",
+        "document_id": 11,
+        "relevant_chunk_ids": [2125]
+    },
+    {
+        "question": "Why is security training important?",
+        "expected_answer": "Security training helps employees recognize threats and reduce security risks.",
+        "document_id": 11,
+        "relevant_chunk_ids": [1881]
+    },
+    {
+        "question": "What are the responsibilities of employees?",
+        "expected_answer": "Employees have responsibilities related to following security policies and protecting organizational information.",
+        "document_id": 11,
+        "relevant_chunk_ids": [1927]
+    },
+    {
+        "question": "What is the purpose of cybersecurity education?",
+        "expected_answer": "Cybersecurity education improves awareness, knowledge, and secure behavior.",
+        "document_id": 11,
+        "relevant_chunk_ids": [1866]
+    },
+    {
+        "question": "What is the role of security awareness programs?",
+        "expected_answer": "Security awareness programs help organizations improve employee understanding of security risks and practices.",
+        "document_id": 11,
+        "relevant_chunk_ids": [1881, 1983]
+    }
+]

@@ -91,7 +91,8 @@ class RAGPipeline:
                     "I don't have enough information "
                     "to answer this question."
                 ),
-                "sources": []
+                "sources": [],
+                "retrieval_status": "irrelevant"
             }
 
         # 3. Build prompt
@@ -117,5 +118,7 @@ class RAGPipeline:
 
         return {
             "answer": answer,
-            "sources": sources
+            "sources": sources,
+            "evaluation_context": context,
+            "retrieval_status": "relevant"
         }
