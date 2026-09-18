@@ -6,6 +6,13 @@ from generation.pipeline import RAGPipeline
 from api.schemas import AskRequest, AskResponse
 from generation.llm import GeminiServiceError
 
+import os
+import tempfile
+
+from fastapi import UploadFile, File
+from Scripts.ingest import ingest_pdf
+
+
 router = APIRouter()
 
 pipeline: RAGPipeline | None = None
@@ -82,3 +89,51 @@ def health_check():
         "status": "healthy",
         "service": "VERITAS-RAG API"
     }
+    
+@router.post("/ingest")
+async def ingest_document(
+    file: UploadFile = File(...)
+):
+
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF files are supported."
+        )
+
+    temp_path = None
+
+    try:
+
+        file_content = await file.read()
+
+        with tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=".pdf"
+        ) as temp_file:
+
+            temp_file.write(file_content)
+            temp_path = temp_file.name
+
+        document = ingest_pdf(temp_path)
+
+        return {
+            "message": "Document ingested successfully",
+            "document_id": document.id,
+            "filename": document.filename,
+            "status": document.ingestion_status
+        }
+
+    except Exception as error:
+
+        print(f"Ingestion API Error: {error}")
+
+        raise HTTPException(
+            status_code=500,
+            detail="Document ingestion failed."
+        )
+
+    finally:
+
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
